@@ -104,6 +104,18 @@ function truncate(text, maxChars) {
   return text.length > maxChars ? text.slice(0, maxChars) + "\n...[truncated]" : text;
 }
 
+// This chat window is plain text with no Markdown or LaTeX rendering, so equations must be
+// written out the same plain-character way the textbook itself writes them.
+const FORMATTING_RULES =
+  "IMPORTANT FORMATTING RULES: This is a plain-text chat window with NO Markdown and NO LaTeX rendering. " +
+  "Never use LaTeX syntax (no dollar signs, no \\frac, \\cos, \\times, \\sqrt, or any backslash commands, no $$ blocks). " +
+  "Never use Markdown formatting (no **bold**, no ## headings, no bullet asterisks). " +
+  "Write all equations as plain readable text exactly the way the textbook itself does, for example: " +
+  "'Vc = Vcc + Vm cos 2\u03c0fmt', 'm = Vm / Vcc', or 'fo = 1 / (2\u03c0\u221a(LC))'. " +
+  "Use \u221a for square roots, standard keyboard operators (+, -, \u00d7 or *, /, =), Greek letters written directly " +
+  "(\u03c0, \u03b8, \u03bc) and subscripts attached directly to the variable name (Vcc, fm, fc) rather than underscore or LaTeX subscript notation. " +
+  "Use plain numbered lists (1. 2. 3.) and line breaks for structure, never headings or bold markup.\n\n";
+
 // ============================================================
 // POST /ask
 // ============================================================
@@ -135,6 +147,7 @@ app.post("/ask", async (req, res) => {
           `A student is currently reading Chapter ${contextChapters[0].number}: ${contextChapters[0].title}. ` +
           `Answer their question using ONLY the chapter text below. If the question truly cannot be answered from this chapter ` +
           `(it's about a different topic covered elsewhere in the book), reply with exactly: NEEDS_WIDER_SEARCH\n\n` +
+          FORMATTING_RULES +
           `--- CHAPTER TEXT ---\n${ctx}\n--- END CHAPTER TEXT ---\n\n` +
           `Student's question: ${question}`
       }];
@@ -156,6 +169,7 @@ app.post("/ask", async (req, res) => {
         role: "user",
         content: `You are a study assistant for the textbook "Foundational Principles of Electronic Communication Systems". ` +
           `Answer the student's question as well as you can. If you're not confident the book covers this, say so honestly.\n\n` +
+          FORMATTING_RULES +
           `Available context:\n${truncate(fallbackCtx, 20000)}\n\nStudent's question: ${question}`
       }];
       const answer = await callClaude(messages, 700);
@@ -167,6 +181,7 @@ app.post("/ask", async (req, res) => {
       role: "user",
       content: `You are a study assistant for the textbook "Foundational Principles of Electronic Communication Systems". ` +
         `Answer the student's question using the most relevant chapter(s) below. Mention which chapter your answer draws from.\n\n` +
+        FORMATTING_RULES +
         `${combinedCtx}\n\nStudent's question: ${question}`
     }];
     const answer = await callClaude(messages, 800);
@@ -195,7 +210,10 @@ app.post("/quiz", async (req, res) => {
       `Return ONLY valid JSON (no markdown fences, no commentary) matching exactly this shape:\n` +
       `{"questions":[{"prompt":"...","options":[{"text":"...","correct":true},{"text":"...","correct":false},{"text":"...","correct":false},{"text":"...","correct":false}],"explanation":"..."}]}\n` +
       `Requirements: exactly 5 questions, exactly 4 options each with exactly one marked correct:true, questions should cover ` +
-      `distinct parts of the chapter, explanations should be 1-2 sentences citing the relevant concept.\n\n` +
+      `distinct parts of the chapter, explanations should be 1-2 sentences citing the relevant concept. ` +
+      `Within the "prompt" and "explanation" text values, any equations must be written in plain readable characters only ` +
+      `(no LaTeX, no dollar signs, no backslash commands) exactly the way the textbook itself writes them, e.g. 'Vc = Vcc + Vm cos 2\u03c0fmt' ` +
+      `or 'fo = 1 / (2\u03c0\u221a(LC))', using \u221a for square roots and subscripts attached directly to variable names.\n\n` +
       `--- CHAPTER TEXT ---\n${truncate(ch.text, 80000)}\n--- END CHAPTER TEXT ---`;
 
     const raw = await callClaude([{ role: "user", content: prompt }], 2000);
